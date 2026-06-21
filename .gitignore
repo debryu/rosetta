@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Data (too large for git)
+data/shapes3d/3dshapes.h5
+data/shapes3d/images_cache.npy
+data/shapes3d/*.npy
+data/shapes3d/*.h5
+
+# Checkpoints (optional — remove next line if you want to track checkpoints)
+checkpoints/
+
+# Claude local settings
+.claude/settings.local.json
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# OS
+.DS_Store
+Thumbs.db

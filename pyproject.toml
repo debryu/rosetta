@@ -1,0 +1,23 @@
+[project]
+name = "rosetta"
+version = "0.1.0"
+description = "Multi-View Nonlinear ICA on shapes3d — implementation of Gresele et al. (ICML 2020)"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.0",
+    "torchvision",
+    "numpy",
+    "scipy",
+    "scikit-learn",
+    "h5py",
+    "matplotlib",
+    "seaborn",
+    "umap-learn",
+    "tqdm",
+    "jupyter",
+    "ipykernel",
+    "requests",
+]
+
+[dependency-groups]
+dev = []
