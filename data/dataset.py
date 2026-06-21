@@ -29,6 +29,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 import torch
+import torchvision.transforms as T
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
@@ -148,6 +149,7 @@ class Shapes3DPairDataset(Dataset):
         train_frac: float = 0.9,
         seed: int = 42,
         hard_neg_prob: float = 0.5,
+        augment: bool = True,
     ):
         super().__init__()
         self.hdf5_path = hdf5_path
@@ -174,6 +176,22 @@ class Shapes3DPairDataset(Dataset):
         self.hard_neg_prob = hard_neg_prob
         self._rng = np.random.default_rng(seed + (0 if split == "train" else 1))
 
+        # Per-view augmentations applied independently to each image in a pair.
+        # Three-layer stack so no single low-level statistic survives both views:
+        #   ColorJitter  → global brightness/contrast/saturation/hue statistics
+        #   GaussianBlur → spatial frequency / texture fingerprints
+        #   RandomErasing → local patch fingerprints (object edges, color blobs)
+        # hue=0.05 is intentionally smaller than the minimum hue factor step (0.1),
+        # so positive pairs vary less in hue than hard negatives (≥0.1 difference).
+        if augment:
+            self.view_transform: T.Compose | None = T.Compose([
+                T.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.05),
+                T.RandomApply([T.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.5),
+                T.RandomErasing(p=0.5, scale=(0.02, 0.15), ratio=(0.3, 3.3), value=0),
+            ])
+        else:
+            self.view_transform = None
+
     def __len__(self) -> int:
         return len(self.scene_indices)
 
@@ -188,6 +206,10 @@ class Shapes3DPairDataset(Dataset):
         x1 = self._get_image(s_idx, n1)
         x2 = self._get_image(s_idx, n2)
 
+        if self.view_transform is not None:
+            x1 = self.view_transform(x1)
+            x2 = self.view_transform(x2)
+
         # negative: hard (differ in exactly 1 factor) or easy (fully random)
         if rng.random() < self.hard_neg_prob:
             neg_s_idx = _hard_negative_scene(s_idx, rng)
@@ -197,6 +219,9 @@ class Shapes3DPairDataset(Dataset):
                 neg_s_idx = int(rng.integers(0, N_SCENES))
         neg_n = int(rng.integers(0, N_ORIENTATIONS))
         x2_neg = self._get_image(neg_s_idx, neg_n)
+
+        if self.view_transform is not None:
+            x2_neg = self.view_transform(x2_neg)
 
         # source factor labels for x1/x2 (used only in evaluation)
         flat = _flat_index(s_idx, n1)

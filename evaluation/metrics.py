@@ -19,7 +19,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 
 
-def compute_mcc(z_hat: np.ndarray, s_true: np.ndarray) -> tuple[float, np.ndarray]:
+def compute_mcc(z_hat: np.ndarray, s_true: np.ndarray) -> tuple[float, np.ndarray, np.ndarray]:
     """Compute Mean Correlation Coefficient between estimated and true sources.
 
     Args:
@@ -27,8 +27,9 @@ def compute_mcc(z_hat: np.ndarray, s_true: np.ndarray) -> tuple[float, np.ndarra
         s_true: (N, n_factors)   ground-truth source values
 
     Returns:
-        mcc:        scalar mean correlation over optimal assignment
-        assignment: (n_factors,) array of z indices assigned to each factor
+        mcc:         scalar mean correlation over optimal assignment
+        assignment:  (n_factors,) array of z indices assigned to each factor
+        corr_matrix: (latent_dim, n_factors) absolute Pearson correlation matrix
     """
     n_factors = s_true.shape[1]
     latent_dim = z_hat.shape[1]
@@ -50,7 +51,7 @@ def compute_mcc(z_hat: np.ndarray, s_true: np.ndarray) -> tuple[float, np.ndarra
             assignment[c] = r
 
     mcc = float(C[row_ind, col_ind].mean())
-    return mcc, assignment
+    return mcc, assignment, C
 
 
 def linear_probe_r2(z_hat: np.ndarray, s_true: np.ndarray) -> np.ndarray:

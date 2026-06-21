@@ -18,11 +18,14 @@ class Config:
     train_frac: float = 0.9
 
     # model
-    latent_dim: int = 10
-    head_hidden: int = 64
+    latent_dim: int = 5
+    head_hidden: int = 256
 
     # negative sampling
     hard_neg_prob: float = 0.5   # fraction of negatives differing in exactly 1 factor
+
+    # augmentation
+    augment: bool = True         # per-view ColorJitter + GaussianBlur + RandomErasing
 
     # training
     batch_size: int = 256

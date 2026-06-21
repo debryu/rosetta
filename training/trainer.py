@@ -88,13 +88,14 @@ def evaluate_representations(
         all_z.append(z)
     z_hat = np.concatenate(all_z, axis=0)
 
-    mcc, assignment = compute_mcc(z_hat, labels)
+    mcc, assignment, corr_matrix = compute_mcc(z_hat, labels)
     r2 = linear_probe_r2(z_hat, labels)
     orient_var = _orientation_sensitivity(model, dataset, device, n_scenes=100, batch_size=batch_size)
 
     return {
         "mcc": mcc,
         "assignment": assignment,
+        "corr_matrix": corr_matrix,
         "r2": r2,
         "orient_var": orient_var,
         "z_hat": z_hat,
@@ -146,9 +147,11 @@ def train(cfg: Config):
 
     print("Loading dataset...")
     train_ds = Shapes3DPairDataset(cfg.hdf5_path, split="train", train_frac=cfg.train_frac,
-                                   seed=cfg.seed, hard_neg_prob=cfg.hard_neg_prob)
+                                   seed=cfg.seed, hard_neg_prob=cfg.hard_neg_prob,
+                                   augment=cfg.augment)
     val_ds   = Shapes3DPairDataset(cfg.hdf5_path, split="val",   train_frac=cfg.train_frac,
-                                   seed=cfg.seed, hard_neg_prob=cfg.hard_neg_prob)
+                                   seed=cfg.seed, hard_neg_prob=cfg.hard_neg_prob,
+                                   augment=False)
 
     train_loader = DataLoader(
         train_ds,
@@ -195,9 +198,14 @@ def train(cfg: Config):
             mcc = results["mcc"]
             r2 = results["r2"]
             orient_var = results["orient_var"]
+            corr_matrix = results["corr_matrix"]
             mccs[epoch] = mcc
             r2_str = " ".join(f"{v:.2f}" for v in r2)
             print(f" | MCC {mcc:.4f} | orient_var {orient_var:.4f} | R² [{r2_str}]", end="")
+            # Per-column max of the correlation matrix reveals dimensional collapse:
+            # if any factor's max correlation is low, no latent dimension tracks it.
+            col_max_str = " ".join(f"{corr_matrix[:, j].max():.2f}" for j in range(corr_matrix.shape[1]))
+            print(f"\n  corr_max/factor [{col_max_str}]", end="")
 
             if mcc > best_mcc:
                 best_mcc = mcc

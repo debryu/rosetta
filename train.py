@@ -21,6 +21,8 @@ def main():
     parser.add_argument("--eval_samples", type=int, default=10000)
     parser.add_argument("--checkpoint_dir", default="checkpoints")
     parser.add_argument("--hard_neg_prob", type=float, default=0.5)
+    parser.add_argument("--no_augment", action="store_true",
+                        help="Disable per-view augmentations (shortcut-prone baseline)")
     parser.add_argument("--device", default="")
     args = parser.parse_args()
 
@@ -38,6 +40,7 @@ def main():
         eval_samples=args.eval_samples,
         checkpoint_dir=args.checkpoint_dir,
         hard_neg_prob=args.hard_neg_prob,
+        augment=not args.no_augment,
     )
     if args.device:
         cfg.device = args.device
