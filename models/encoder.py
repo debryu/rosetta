@@ -21,29 +21,31 @@ class Encoder(nn.Module):
         self.latent_dim = latent_dim
 
         self.conv = nn.Sequential(
-            # 3 x 64 x 64 -> 32 x 32 x 32
-            nn.Conv2d(3, 32, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            # 32 x 32 x 32 -> 64 x 16 x 16
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1),
+            # 3 x 64 x 64 -> 64 x 32 x 32
+            nn.Conv2d(3, 64, kernel_size=4, stride=2, padding=1),
             nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            # 64 x 16 x 16 -> 128 x 8 x 8
+            nn.LeakyReLU(0.2, inplace=True),
+            # 64 x 32 x 32 -> 128 x 16 x 16
             nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),
             nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            # 128 x 8 x 8 -> 256 x 4 x 4
+            nn.LeakyReLU(0.2, inplace=True),
+            # 128 x 16 x 16 -> 256 x 8 x 8
             nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=1),
             nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
+            # 256 x 8 x 8 -> 512 x 4 x 4
+            nn.Conv2d(256, 512, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(0.2, inplace=True),
         )
 
-        # 256 * 4 * 4 = 4096 after 64->32->16->8->4 (stride-2 convs with padding=1)
+        # 512 * 4 * 4 = 8192
         self.fc = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(256 * 4 * 4, 256),
-            nn.ReLU(inplace=True),
+            nn.Linear(512 * 4 * 4, 1024),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(1024, 256),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(256, latent_dim),
         )
 

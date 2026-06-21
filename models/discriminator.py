@@ -38,8 +38,10 @@ class MultiViewDiscriminator(nn.Module):
         self.psis = nn.ModuleList([
             nn.Sequential(
                 nn.Linear(2, head_hidden),
-                nn.Tanh(),
-                nn.Linear(head_hidden, 1),
+                nn.LeakyReLU(0.2),
+                nn.Linear(head_hidden, head_hidden // 2),
+                nn.LeakyReLU(0.2),
+                nn.Linear(head_hidden // 2, 1),
             )
             for _ in range(latent_dim)
         ])
