@@ -26,6 +26,7 @@ class Config:
 
     # augmentation
     augment: bool = True         # per-view ColorJitter + GaussianBlur + RandomErasing
+    same_orientation: bool = False  # True → orientation is a 6th source factor; noise = augmentations only
 
     # training
     batch_size: int = 256

@@ -23,6 +23,9 @@ def main():
     parser.add_argument("--hard_neg_prob", type=float, default=0.5)
     parser.add_argument("--no_augment", action="store_true",
                         help="Disable per-view augmentations (shortcut-prone baseline)")
+    parser.add_argument("--same_orientation", action="store_true",
+                        help="Positive pairs share orientation; augmentations are the only noise. "
+                             "Adds orientation as a 6th recoverable factor (use --latent_dim 6).")
     parser.add_argument("--device", default="")
     args = parser.parse_args()
 
@@ -41,6 +44,7 @@ def main():
         checkpoint_dir=args.checkpoint_dir,
         hard_neg_prob=args.hard_neg_prob,
         augment=not args.no_augment,
+        same_orientation=args.same_orientation,
     )
     if args.device:
         cfg.device = args.device

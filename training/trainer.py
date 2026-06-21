@@ -148,10 +148,10 @@ def train(cfg: Config):
     print("Loading dataset...")
     train_ds = Shapes3DPairDataset(cfg.hdf5_path, split="train", train_frac=cfg.train_frac,
                                    seed=cfg.seed, hard_neg_prob=cfg.hard_neg_prob,
-                                   augment=cfg.augment)
+                                   augment=cfg.augment, same_orientation=cfg.same_orientation)
     val_ds   = Shapes3DPairDataset(cfg.hdf5_path, split="val",   train_frac=cfg.train_frac,
                                    seed=cfg.seed, hard_neg_prob=cfg.hard_neg_prob,
-                                   augment=False)
+                                   augment=False, same_orientation=cfg.same_orientation)
 
     train_loader = DataLoader(
         train_ds,

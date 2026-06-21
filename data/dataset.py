@@ -150,6 +150,7 @@ class Shapes3DPairDataset(Dataset):
         seed: int = 42,
         hard_neg_prob: float = 0.5,
         augment: bool = True,
+        same_orientation: bool = False,
     ):
         super().__init__()
         self.hdf5_path = hdf5_path
@@ -174,6 +175,7 @@ class Shapes3DPairDataset(Dataset):
             self.scene_indices = scene_perm[n_train:]
 
         self.hard_neg_prob = hard_neg_prob
+        self.same_orientation = same_orientation
         self._rng = np.random.default_rng(seed + (0 if split == "train" else 1))
 
         # Per-view augmentations applied independently to each image in a pair.
@@ -200,8 +202,13 @@ class Shapes3DPairDataset(Dataset):
 
         s_idx = int(self.scene_indices[idx])
 
-        # sample two distinct orientations for the positive pair
-        n1, n2 = rng.choice(N_ORIENTATIONS, size=2, replace=False)
+        # sample orientation(s) for the positive pair
+        if self.same_orientation:
+            # orientation is a shared source factor; augmentations provide the view variation
+            n = int(rng.integers(0, N_ORIENTATIONS))
+            n1, n2 = n, n
+        else:
+            n1, n2 = rng.choice(N_ORIENTATIONS, size=2, replace=False)
 
         x1 = self._get_image(s_idx, n1)
         x2 = self._get_image(s_idx, n2)
@@ -235,13 +242,25 @@ class Shapes3DPairDataset(Dataset):
         return torch.from_numpy(img).float().div_(255.0).permute(2, 0, 1)
 
     def get_all_latents_and_labels(self, max_samples: int = 10000):
-        """Return a fixed subset of raw images and their 5 source labels.
-        Used for computing MCC and linear-probe R² after training.
+        """Return a fixed subset of raw images and their source labels.
+
+        When same_orientation=False: returns 5-dim labels (the 5 shared source factors)
+        using a fixed orientation (index 0) for all images.
+
+        When same_orientation=True: orientation is a 6th source factor, so orientations
+        are varied across eval samples and 6-dim labels are returned.
         """
         n = min(max_samples, len(self.scene_indices))
         indices = self.scene_indices[:n]
-        flat_indices = np.array([_flat_index(int(s), 0) for s in indices])
+        if self.same_orientation:
+            rng = np.random.default_rng(0)
+            orient_indices = rng.integers(0, N_ORIENTATIONS, size=n)
+            flat_indices = np.array([_flat_index(int(s), int(o))
+                                     for s, o in zip(indices, orient_indices)])
+            labels = self.labels[flat_indices, :6]   # (N, 6) — all factors incl. orientation
+        else:
+            flat_indices = np.array([_flat_index(int(s), 0) for s in indices])
+            labels = self.labels[flat_indices, :5]   # (N, 5)
         imgs = np.array(self.images[flat_indices])   # (N, 64, 64, 3) uint8
         images = torch.from_numpy(imgs).float().div_(255.0).permute(0, 3, 1, 2)
-        labels = self.labels[flat_indices, :5]       # (N, 5)
         return images, labels
