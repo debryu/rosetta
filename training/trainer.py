@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from config import Config
-from data import Shapes3DPairDataset, download_shapes3d
+from data import Shapes3DPairDataset, download_shapes3d, N_ORIENTATIONS
 from evaluation.metrics import compute_mcc, linear_probe_r2
 from models import MultiViewDiscriminator
 
@@ -90,14 +90,46 @@ def evaluate_representations(
 
     mcc, assignment = compute_mcc(z_hat, labels)
     r2 = linear_probe_r2(z_hat, labels)
+    orient_var = _orientation_sensitivity(model, dataset, device, n_scenes=100, batch_size=batch_size)
 
     return {
         "mcc": mcc,
         "assignment": assignment,
         "r2": r2,
+        "orient_var": orient_var,
         "z_hat": z_hat,
         "labels": labels,
     }
+
+
+@torch.no_grad()
+def _orientation_sensitivity(
+    model: MultiViewDiscriminator,
+    dataset: Shapes3DPairDataset,
+    device: str,
+    n_scenes: int = 100,
+    batch_size: int = 512,
+) -> float:
+    """Mean variance of latent codes across orientations for fixed scenes.
+
+    Measures how much the encoder responds to orientation (the noise variable).
+    Lower is better — the encoder should be invariant to orientation.
+    """
+    model.eval()
+    scene_indices = dataset.scene_indices[:n_scenes]
+    variances = []
+
+    for s_idx in scene_indices:
+        imgs = torch.stack([
+            dataset._get_image(int(s_idx), o) for o in range(N_ORIENTATIONS)
+        ]).to(device)
+        codes = []
+        for start in range(0, len(imgs), batch_size):
+            codes.append(model.encode(imgs[start:start + batch_size]).cpu().numpy())
+        codes = np.concatenate(codes, axis=0)   # (N_ORIENTATIONS, latent_dim)
+        variances.append(float(codes.var(axis=0).mean()))
+
+    return float(np.mean(variances))
 
 
 def train(cfg: Config):
@@ -113,8 +145,10 @@ def train(cfg: Config):
         download_shapes3d(cfg.data_dir)
 
     print("Loading dataset...")
-    train_ds = Shapes3DPairDataset(cfg.hdf5_path, split="train", train_frac=cfg.train_frac, seed=cfg.seed)
-    val_ds   = Shapes3DPairDataset(cfg.hdf5_path, split="val",   train_frac=cfg.train_frac, seed=cfg.seed)
+    train_ds = Shapes3DPairDataset(cfg.hdf5_path, split="train", train_frac=cfg.train_frac,
+                                   seed=cfg.seed, hard_neg_prob=cfg.hard_neg_prob)
+    val_ds   = Shapes3DPairDataset(cfg.hdf5_path, split="val",   train_frac=cfg.train_frac,
+                                   seed=cfg.seed, hard_neg_prob=cfg.hard_neg_prob)
 
     train_loader = DataLoader(
         train_ds,
@@ -160,9 +194,10 @@ def train(cfg: Config):
             )
             mcc = results["mcc"]
             r2 = results["r2"]
+            orient_var = results["orient_var"]
             mccs[epoch] = mcc
             r2_str = " ".join(f"{v:.2f}" for v in r2)
-            print(f" | MCC {mcc:.4f} | R² [{r2_str}]", end="")
+            print(f" | MCC {mcc:.4f} | orient_var {orient_var:.4f} | R² [{r2_str}]", end="")
 
             if mcc > best_mcc:
                 best_mcc = mcc

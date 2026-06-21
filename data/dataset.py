@@ -103,6 +103,34 @@ def _flat_index(s_idx: int, n_idx: int) -> int:
     return s_idx * N_ORIENTATIONS + n_idx
 
 
+# Mixed-radix strides for the 5 source factors (floor_hue slowest, shape fastest)
+SOURCE_FACTOR_STRIDES = [3200, 320, 32, 4, 1]
+
+
+def _scene_to_factors(s_idx: int) -> list[int]:
+    """Decode a flat scene index into its 5 factor indices."""
+    factors = []
+    remaining = s_idx
+    for stride, size in zip(SOURCE_FACTOR_STRIDES, SOURCE_FACTOR_SIZES):
+        factors.append(remaining // stride)
+        remaining = remaining % stride
+    return factors
+
+
+def _hard_negative_scene(s_idx: int, rng: np.random.Generator) -> int:
+    """Return a scene that differs from s_idx in exactly one randomly chosen factor.
+
+    This forces the encoder to precisely recover each factor individually,
+    preventing the model from relying on multi-factor differences as shortcuts.
+    """
+    factors = _scene_to_factors(s_idx)
+    fi = int(rng.integers(0, len(SOURCE_FACTOR_SIZES)))
+    size = SOURCE_FACTOR_SIZES[fi]
+    offset = int(rng.integers(1, size))
+    factors[fi] = (factors[fi] + offset) % size
+    return sum(f * s for f, s in zip(factors, SOURCE_FACTOR_STRIDES))
+
+
 class Shapes3DPairDataset(Dataset):
     """Returns contrastive triplets (x1, x2, x2_neg) for multi-view ICA training.
 
@@ -119,6 +147,7 @@ class Shapes3DPairDataset(Dataset):
         split: str = "train",
         train_frac: float = 0.9,
         seed: int = 42,
+        hard_neg_prob: float = 0.5,
     ):
         super().__init__()
         self.hdf5_path = hdf5_path
@@ -142,6 +171,7 @@ class Shapes3DPairDataset(Dataset):
         else:
             self.scene_indices = scene_perm[n_train:]
 
+        self.hard_neg_prob = hard_neg_prob
         self._rng = np.random.default_rng(seed + (0 if split == "train" else 1))
 
     def __len__(self) -> int:
@@ -158,10 +188,13 @@ class Shapes3DPairDataset(Dataset):
         x1 = self._get_image(s_idx, n1)
         x2 = self._get_image(s_idx, n2)
 
-        # negative: a different scene (guaranteed different s)
-        neg_s_idx = s_idx
-        while neg_s_idx == s_idx:
-            neg_s_idx = int(rng.integers(0, N_SCENES))
+        # negative: hard (differ in exactly 1 factor) or easy (fully random)
+        if rng.random() < self.hard_neg_prob:
+            neg_s_idx = _hard_negative_scene(s_idx, rng)
+        else:
+            neg_s_idx = s_idx
+            while neg_s_idx == s_idx:
+                neg_s_idx = int(rng.integers(0, N_SCENES))
         neg_n = int(rng.integers(0, N_ORIENTATIONS))
         x2_neg = self._get_image(neg_s_idx, neg_n)
 

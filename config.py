@@ -19,7 +19,10 @@ class Config:
 
     # model
     latent_dim: int = 10
-    head_hidden: int = 256
+    head_hidden: int = 64
+
+    # negative sampling
+    hard_neg_prob: float = 0.5   # fraction of negatives differing in exactly 1 factor
 
     # training
     batch_size: int = 256

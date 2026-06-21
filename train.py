@@ -20,6 +20,7 @@ def main():
     parser.add_argument("--eval_every", type=int, default=5)
     parser.add_argument("--eval_samples", type=int, default=10000)
     parser.add_argument("--checkpoint_dir", default="checkpoints")
+    parser.add_argument("--hard_neg_prob", type=float, default=0.5)
     parser.add_argument("--device", default="")
     args = parser.parse_args()
 
@@ -36,6 +37,7 @@ def main():
         eval_every=args.eval_every,
         eval_samples=args.eval_samples,
         checkpoint_dir=args.checkpoint_dir,
+        hard_neg_prob=args.hard_neg_prob,
     )
     if args.device:
         cfg.device = args.device
